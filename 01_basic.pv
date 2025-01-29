@@ -1,0 +1,24 @@
+free a, b: bitstring.
+free c: channel.
+free m: bitstring[private].
+
+type key.
+fun senc(bitstring, key): bitstring.
+reduc forall x: bitstring, y: key; sdec(senc(x,y),y) = x.
+
+query attacker(m).
+event begin(bitstring,bitstring,bitstring).
+event end(bitstring,bitstring,bitstring).
+query x:bitstring, y:bitstring, z:bitstring; event(end(x,y,z)) ==> event(begin(x,y,z)).
+query x:bitstring, y:bitstring, z:bitstring; inj-event(end(x,y,z)) ==> inj-event(begin(x,y,z)).
+
+let sender(m:bitstring, k:key) =
+	event begin(a,b,m);
+	out(c,senc(m,k)).
+
+let receiver(k:key) =
+	in(c,xm:bitstring);
+	let ym = sdec(xm,k) in event end(a,b,ym).
+
+process
+	new k: key; (!sender(m,k) | !receiver(k))

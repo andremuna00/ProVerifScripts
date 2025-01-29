@@ -1,0 +1,46 @@
+free a, b: bitstring.
+free c: channel.
+free m: bitstring[private].
+
+type skey.
+type pkey.
+type key.
+fun pk(skey): pkey.
+fun sign(bitstring, skey): bitstring.
+reduc forall x: bitstring, y: skey; ver(sign(x,y),pk(y)) = x.
+fun enc(bitstring, pkey): bitstring.
+reduc forall x: bitstring, y: skey; dec(enc(x,pk(y)),y) = x.
+fun senc(bitstring, key): bitstring.
+reduc forall x: bitstring, y: key; sdec(senc(x,y),y) = x.
+fun tos(key): bitstring[ typeConverter ].
+fun tok(bitstring): key[ typeConverter ].
+
+query attacker(m).
+event begin(bitstring,bitstring,bitstring).
+event end(bitstring,bitstring,bitstring).
+query x:bitstring, y:bitstring, z:bitstring; event(end(x,y,z)) ==> event(begin(x,y,z)).
+query x:bitstring, y:bitstring, z:bitstring; inj-event(end(x,y,z)) ==> inj-event(begin(x,y,z)).
+event finish(bitstring).
+query x:bitstring;event(finish(x)).
+
+let sender(id1: bitstring, sk:skey, vk:pkey, cert: bitstring) =
+    in(c, id2: bitstring);
+    new k:key;
+    event begin(id1, id2, tos(k));
+    out(c, enc(tos(k), vk));
+    in(c, z:bitstring);
+    let (n) = sdec(z,k) in 
+        out(c, senc((cert, sign(n, sk)), k)).
+
+let receiver(id1: bitstring, id2: bitstring, sk:skey, vk:pkey, vsk: pkey) =
+    new n:bitstring;
+    in (c, m1:bitstring);
+    let (k:bitstring) = dec(m1,sk) in out(c, senc(n, tok(k)));
+    in (c, m2:bitstring);
+    let (cert:bitstring, nonce:bitstring) = sdec(m2,tok(k)) in
+        let((=id1, =vk), =n) = (ver(cert, vsk), ver(nonce, vk)) in
+            (*event finish(s1).*)
+            event end(id1,id2,k).
+
+process
+	new kb: skey;new ka: skey;new ks: skey; (!sender(a,ka,pk(kb),sign((a, pk(ka)), ks)) | !receiver(a,b, kb, pk(ka), pk(ks)) | out(c,(pk(kb), pk(ka))))
